@@ -669,13 +669,13 @@
 
         <div class="tabs">
             <div class="tab-buttons">
-                <button class="tab-button active" onclick="switchTab('training')">🎯 Training</button>
-                <button class="tab-button" onclick="switchTab('history')">📚 My History</button>
-                <button class="tab-button" onclick="switchTab('insights')">💡 Insights</button>
-                <button class="tab-button" onclick="switchTab('leaderboard')">🏆 Leaderboard</button>
-                <button class="tab-button" onclick="switchTab('upload')">🎤 Upload Calls</button>
-                <button class="tab-button manager-only" onclick="switchTab('teamanalytics')" style="display: none;" id="tabTeamAnalytics">📊 Team Analytics</button>
-                <button class="tab-button manager-only" onclick="switchTab('managerdash')" style="display: none;" id="tabManagerDash">👔 Manager Dashboard</button>
+                <button class="tab-button active" onclick="switchTab('training', event)">🎯 Training</button>
+                <button class="tab-button" onclick="switchTab('history', event)">📚 My History</button>
+                <button class="tab-button" onclick="switchTab('insights', event)">💡 Insights</button>
+                <button class="tab-button" onclick="switchTab('leaderboard', event)">🏆 Leaderboard</button>
+                <button class="tab-button" onclick="switchTab('upload', event)">🎤 Upload Calls</button>
+                <button class="tab-button manager-only" onclick="switchTab('teamanalytics', event)" style="display: none;" id="tabTeamAnalytics">📊 Team Analytics</button>
+                <button class="tab-button manager-only" onclick="switchTab('managerdash', event)" style="display: none;" id="tabManagerDash">👔 Manager Dashboard</button>
             </div>
 
             <div id="training" class="tab-content active">
@@ -1130,11 +1130,24 @@
             document.getElementById('tabManagerDash').style.display = showManager ? 'block' : 'none';
         }
 
-        function switchTab(tabName) {
+        function switchTab(tabName, event) {
+            // Get the clicked button - either from event or find it by tabName
+            let clickedButton;
+            if (event && event.target) {
+                clickedButton = event.target;
+            } else {
+                // Find the button that was clicked by matching the onclick attribute
+                clickedButton = Array.from(document.querySelectorAll('.tab-button')).find(btn => 
+                    btn.getAttribute('onclick').includes(`'${tabName}'`)
+                );
+            }
+            
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             
-            event.target.classList.add('active');
+            if (clickedButton) {
+                clickedButton.classList.add('active');
+            }
             document.getElementById(tabName).classList.add('active');
 
             if (tabName === 'history') loadHistory();
@@ -1315,21 +1328,251 @@
             input.value = '';
 
             // Analyze response quality
-            const hasEmpathy = /understand|sorry|appreciate|thank/i.test(response);
-            const hasSolution = /offer|can|help|would|option|plan/i.test(response);
-            const isPushy = /must|should|need to|have to/i.test(response);
+            const responseLower = response.toLowerCase();
+            const hasEmpathy = /understand|appreciate|thank|hear you|get it|makes sense|sorry|feel|tough|difficult/i.test(response);
+            const hasSolution = /offer|can|help|would|option|plan|discount|match|save|provide|give/i.test(response);
+            const isPushy = /must|should|need to|have to|wrong|mistake|required|necessary/i.test(response);
+            const hasPrice = /price|cost|\$|dollar|match|lower|reduce|discount|deal|save money/i.test(response);
+            const hasQuality = /quality|local|service|better|experience|guarantee|family|trust|reliable/i.test(response);
+            const hasWarning = /bait|switch|increase|fine print|first year|promotional|raise|double|triple/i.test(response);
+            const hasCredit = /credit|refund|comp|free|discount|money back/i.test(response);
+            const hasAction = /will|going to|schedule|arrange|personally|manager|supervisor|ensure/i.test(response);
+            const hasPause = /pause|suspend|hold|temporary|freeze|stop for now/i.test(response);
+            const hasPayment = /payment|split|installment|bi-weekly|monthly|spread out|smaller/i.test(response);
+            const hasInspection = /look|inspect|come out|visit|check|evaluate|assess/i.test(response);
+            const hasTransfer = /transfer|move|new address|continue|keep service/i.test(response);
 
             if (hasEmpathy) currentSession.goodMoves++;
             if (hasSolution) currentSession.goodMoves++;
             if (isPushy) currentSession.badMoves++;
 
-            // Simulate customer response
+            // Calculate exchanges
+            const exchanges = Math.floor(currentSession.conversation.length / 2);
+
+            // Simulate customer response based on scenario and agent approach
             setTimeout(() => {
-                const customerResponse = hasEmpathy && hasSolution ? 
-                    "That's helpful, thank you. Let me think about those options." :
-                    isPushy ? 
-                    "I appreciate your time, but I've made up my mind." :
-                    "I understand, but I still need to cancel.";
+                let customerResponse = "";
+                const scenario = currentSession.scenario;
+
+                // Check if conversation should conclude (after 4 exchanges)
+                if (exchanges >= 4) {
+                    const currentScore = currentSession.score || 50;
+                    if (currentScore >= 75) {
+                        const goodEndings = [
+                            "You know what, you've made some really good points. Let me think about this before I make a final decision.",
+                            "I really appreciate you working with me on this. Let me talk to my spouse and I'll call you back.",
+                            "Okay, that actually sounds reasonable. Let's give this a try and see how it goes.",
+                            "You've been very helpful. I'm willing to keep the service with these changes you've offered."
+                        ];
+                        customerResponse = goodEndings[Math.floor(Math.random() * goodEndings.length)];
+                    } else if (currentScore >= 55) {
+                        const okayEndings = [
+                            "I appreciate your help, but I think I'm still going to go ahead with the cancellation.",
+                            "Thanks for trying, but I don't think this is going to work out for me.",
+                            "I understand what you're saying, but I've already made my decision. Sorry.",
+                            "You've been nice, but I really need to cancel. Thank you though."
+                        ];
+                        customerResponse = okayEndings[Math.floor(Math.random() * okayEndings.length)];
+                    } else {
+                        const poorEndings = [
+                            "Look, I've made my decision. I need to cancel. Thank you for your time.",
+                            "I don't think this conversation is going anywhere. Please just cancel my service.",
+                            "I appreciate you trying, but I'm done. I'd like to cancel now please.",
+                            "This isn't working. I'm going to cancel. Have a good day."
+                        ];
+                        customerResponse = poorEndings[Math.floor(Math.random() * poorEndings.length)];
+                    }
+                } else {
+                    // Scenario-specific intelligent responses
+                    if (scenario === 'competitor') {
+                        if (exchanges === 1) {
+                            if (hasQuality && !hasPrice) {
+                                customerResponse = "That's a good point about quality and local service. But they're still $40 cheaper - that's real money every month.";
+                            } else if (hasWarning) {
+                                customerResponse = "Really? It does say 'promotional rate' in the fine print. What usually happens after the first year?";
+                            } else if (hasPrice) {
+                                customerResponse = "Can you actually match their price? Because if not, I don't see a reason to stay.";
+                            } else if (isPushy) {
+                                customerResponse = "I'm not making a mistake - I'm trying to save money. Please don't talk down to me.";
+                            } else if (hasEmpathy) {
+                                customerResponse = "Thanks for understanding. But $40 a month is almost $500 a year - that matters to my family.";
+                            } else {
+                                customerResponse = "I appreciate that, but at the end of the day, price really matters to me.";
+                            }
+                        } else if (exchanges === 2) {
+                            if (hasWarning && hasQuality) {
+                                customerResponse = "You're right, I should read the fine print more carefully. And I do like having a local company...";
+                            } else if (hasPrice && responseLower.includes('match')) {
+                                customerResponse = "So you can actually match their price? For how long - is this just temporary too?";
+                            } else if (hasPrice && responseLower.includes('discount')) {
+                                customerResponse = "How much of a discount are we talking about? Can you get close to their price?";
+                            } else {
+                                customerResponse = "I hear what you're saying, but I'm still not convinced it's worth $40 more per month.";
+                            }
+                        } else {
+                            if (hasPrice || responseLower.includes('15%') || responseLower.includes('discount')) {
+                                customerResponse = "Okay, that does help close the gap. Let me think about whether that's worth it for the better service.";
+                            } else if (hasQuality) {
+                                customerResponse = "The local service angle is appealing. I do like knowing who's coming to my house...";
+                            } else {
+                                customerResponse = "I'm still leaning toward switching, to be honest. The savings are hard to ignore.";
+                            }
+                        }
+                    } else if (scenario === 'financial') {
+                        if (exchanges === 1) {
+                            if (hasPause) {
+                                customerResponse = "Wait, I can pause the service? I didn't know that was an option! How long can I pause for?";
+                            } else if (hasPayment) {
+                                customerResponse = "Payment plans might help. Can I do smaller payments more frequently? That would be easier on my budget.";
+                            } else if (hasEmpathy && hasSolution) {
+                                customerResponse = "Thank you, I appreciate you understanding. What kind of options do you have?";
+                            } else if (isPushy) {
+                                customerResponse = "I literally can't afford it. Telling me I 'need' to keep it doesn't help my situation.";
+                            } else if (hasEmpathy) {
+                                customerResponse = "Thanks for understanding. It's been really stressful with the job loss.";
+                            } else {
+                                customerResponse = "I understand, but money is really tight right now. I have to cut expenses.";
+                            }
+                        } else if (exchanges === 2) {
+                            if (hasPause && responseLower.includes('month')) {
+                                customerResponse = "So I could pause for a few months until I find a new job? Is there a fee to restart?";
+                            } else if (hasPayment) {
+                                customerResponse = "Okay, breaking it into smaller payments could actually work. How would that be set up?";
+                            } else if (responseLower.includes('reduce') || responseLower.includes('basic')) {
+                                customerResponse = "A reduced service level... what would that include? Just the basics to keep weeds down?";
+                            } else {
+                                customerResponse = "I appreciate the options, but I'm not sure any of them work with my current situation.";
+                            }
+                        } else {
+                            if (hasPause || hasPayment) {
+                                customerResponse = "You know, that payment plan option might actually let me keep the service. Let me think about it.";
+                            } else if (responseLower.includes('prepay') || responseLower.includes('discount')) {
+                                customerResponse = "A discount would help, but I don't have money to prepay right now since I lost my job.";
+                            } else {
+                                customerResponse = "I really do want to keep the service, but I just can't afford it right now.";
+                            }
+                        }
+                    } else if (scenario === 'bad_service') {
+                        if (exchanges === 1) {
+                            if (responseLower.includes('sorry') || responseLower.includes('apologize')) {
+                                customerResponse = "I appreciate the apology, but I need more than words. What are you actually going to DO about it?";
+                            } else if (hasCredit) {
+                                customerResponse = "Okay, a credit is something. How much are we talking about? And what about the missed appointments?";
+                            } else if (hasAction) {
+                                customerResponse = "What exactly will you do differently? Because I've been through this before with empty promises.";
+                            } else if (isPushy || responseLower.includes('happen')) {
+                                customerResponse = "Three times in a row isn't just 'something that happens' - it's unacceptable. Don't make excuses.";
+                            } else {
+                                customerResponse = "I've heard this all before. Talk is cheap - I need to see actual changes.";
+                            }
+                        } else if (exchanges === 2) {
+                            if (hasAction && responseLower.includes('dedicated')) {
+                                customerResponse = "A dedicated tech who actually shows up? That would be a big improvement. Can you guarantee that?";
+                            } else if (hasCredit && (responseLower.includes('month') || responseLower.includes('free'))) {
+                                customerResponse = "That's a reasonable credit. But I still need assurance this won't keep happening.";
+                            } else if (responseLower.includes('manager') || responseLower.includes('supervisor')) {
+                                customerResponse = "Having a manager personally handle this does make me feel a bit better about it...";
+                            } else {
+                                customerResponse = "I'm still not convinced anything will actually change. Why should I believe you this time?";
+                            }
+                        } else {
+                            if (hasCredit && hasAction) {
+                                customerResponse = "Okay, between the credit and the dedicated tech assignment, you're taking this seriously. Let me think about it.";
+                            } else if (hasEmpathy && hasAction) {
+                                customerResponse = "I appreciate you acknowledging the problem and offering a real solution. That helps.";
+                            } else {
+                                customerResponse = "I've given you guys enough chances. I think it's time to move on to a more reliable company.";
+                            }
+                        }
+                    } else if (scenario === 'not_working') {
+                        if (exchanges === 1) {
+                            if (hasInspection) {
+                                customerResponse = "Okay, having someone come look at it would be good. When can they come? And will this actually fix it?";
+                            } else if (responseLower.includes('specialist') || responseLower.includes('expert')) {
+                                customerResponse = "A specialist who knows what they're doing - that's what I need. When can they come out?";
+                            } else if (responseLower.includes('free') || hasCredit) {
+                                customerResponse = "Free re-treatment is the least you can do since I've been paying for nothing. What's different this time?";
+                            } else if (isPushy || responseLower.includes('take time')) {
+                                customerResponse = "Six months is plenty of time! Don't tell me I need to be more patient.";
+                            } else if (hasEmpathy) {
+                                customerResponse = "Thanks for understanding my frustration. But I need actual results, not just sympathy.";
+                            } else {
+                                customerResponse = "I've been patient. I just don't think your product works on my lawn.";
+                            }
+                        } else if (exchanges === 2) {
+                            if (hasInspection && responseLower.includes('week')) {
+                                customerResponse = "This week or next week works for me. And they'll figure out what's actually wrong?";
+                            } else if (responseLower.includes('different') || responseLower.includes('stronger')) {
+                                customerResponse = "So you're saying there's a different treatment that might work better? Why wasn't this used before?";
+                            } else if (responseLower.includes('guarantee') || responseLower.includes('promise')) {
+                                customerResponse = "What exactly are you guaranteeing? Because clearly the regular guarantee didn't work.";
+                            } else {
+                                customerResponse = "I'm willing to give it one more shot, but if this doesn't work, I'm definitely canceling.";
+                            }
+                        } else {
+                            if (hasInspection && (hasCredit || responseLower.includes('free'))) {
+                                customerResponse = "Okay, having a specialist come out and re-treat for free is fair. One more chance.";
+                            } else if (responseLower.includes('different product') || responseLower.includes('stronger')) {
+                                customerResponse = "Alright, trying a different approach makes sense. Let's see if this actually works.";
+                            } else {
+                                customerResponse = "I appreciate you trying, but I've lost faith in your service. I'm going to try someone else.";
+                            }
+                        }
+                    } else if (scenario === 'moving') {
+                        const isLocalMove = currentSession.opening && currentSession.opening.includes('8 miles');
+                        if (isLocalMove) {
+                            if (exchanges === 1) {
+                                if (hasTransfer) {
+                                    customerResponse = "That's great! So I can keep the same service and just change the address? How does that work?";
+                                } else if (responseLower.includes('discount') || responseLower.includes('deal')) {
+                                    customerResponse = "Is there a new homeowner discount or something? The new place has a bigger lawn.";
+                                } else if (hasInspection) {
+                                    customerResponse = "Having someone come look at the new place before I move would be perfect. When can they do that?";
+                                } else {
+                                    customerResponse = "So can you help me transfer or do I need to cancel and sign up again as a new customer?";
+                                }
+                            } else {
+                                if (hasTransfer && responseLower.includes('easy')) {
+                                    customerResponse = "Okay great, that's easier than I thought. What information do you need from me?";
+                                } else if (hasInspection) {
+                                    customerResponse = "Perfect, I'd love to get the new place inspected. The lawn is in rough shape right now.";
+                                } else {
+                                    customerResponse = "Awesome, I'm glad I can keep using Spring Touch at my new place!";
+                                }
+                            }
+                        } else {
+                            // Moving out of state
+                            if (exchanges === 1) {
+                                if (hasEmpathy && responseLower.includes('congrat')) {
+                                    customerResponse = "Thanks! It's exciting but also really stressful with all the packing and planning.";
+                                } else if (responseLower.includes('until') || responseLower.includes('keep')) {
+                                    customerResponse = "Hmm, I guess keeping service until I actually move makes sense. When's my next scheduled treatment?";
+                                } else if (responseLower.includes('referral') || responseLower.includes('neighbor')) {
+                                    customerResponse = "Oh, you want referrals? My neighbor actually was asking about lawn services...";
+                                } else {
+                                    customerResponse = "I appreciate that, but I still need to cancel since I won't be here.";
+                                }
+                            } else {
+                                if (responseLower.includes('review') || responseLower.includes('google')) {
+                                    customerResponse = "Sure, I'd be happy to leave a review. You guys have done a good job with my lawn.";
+                                } else if (responseLower.includes('referral')) {
+                                    customerResponse = "Yeah, let me give my neighbor your number. They've been asking who I use.";
+                                } else {
+                                    customerResponse = "Thanks for being understanding. I'll definitely recommend you to people in the area.";
+                                }
+                            }
+                        }
+                    } else {
+                        // Generic fallback
+                        if (hasEmpathy && hasSolution) {
+                            customerResponse = "That's helpful, let me think about those options you mentioned.";
+                        } else if (isPushy) {
+                            customerResponse = "Please don't pressure me. I'm trying to make the right decision here.";
+                        } else {
+                            customerResponse = "I understand, but I still have concerns about moving forward.";
+                        }
+                    }
+                }
                 
                 currentSession.conversation.push({ role: 'customer', content: customerResponse });
                 conversationEl.innerHTML += `<div class="message customer"><strong>👤 Customer</strong>${customerResponse}</div>`;
@@ -1339,7 +1582,6 @@
                 speakText(customerResponse);
 
                 // Update metrics
-                const exchanges = Math.floor(currentSession.conversation.length / 2);
                 document.getElementById('exchangesCount').textContent = exchanges;
                 document.getElementById('goodMovesCount').textContent = currentSession.goodMoves;
                 document.getElementById('badMovesCount').textContent = currentSession.badMoves;
@@ -1347,13 +1589,22 @@
                 // Get base score from the scenario
                 let scenarioData = SCENARIOS[currentSession.scenario];
                 if (Array.isArray(scenarioData)) {
-                    scenarioData = scenarioData[0]; // Use first as default for scoring
+                    scenarioData = scenarioData[0];
                 }
                 const baseScore = scenarioData.baseScore;
                 const score = Math.min(100, Math.max(0, baseScore + (currentSession.goodMoves * 10) - (currentSession.badMoves * 15)));
                 document.getElementById('receptivenessBar').style.width = score + '%';
                 document.getElementById('receptivenessText').textContent = score + '%';
                 currentSession.score = score;
+
+                // Auto-end hint after natural conclusion
+                if (exchanges >= 4 || customerResponse.includes("call you back") || customerResponse.includes("made my decision") || customerResponse.includes("Have a good day")) {
+                    setTimeout(() => {
+                        if (document.getElementById('endBtn').disabled === false) {
+                            updateStatus('💡 Customer has concluded. Click "End Call" to see your results.', 'waiting');
+                        }
+                    }, 2000);
+                }
             }, 1500);
         }
 

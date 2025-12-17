@@ -667,6 +667,81 @@
             </div>
         </div>
 
+        <!-- ElevenLabs Settings Panel -->
+        <div class="card" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 2px solid #0ea5e9; margin: 20px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="color: #0c4a6e;">🎙️ ElevenLabs Ultra-Realistic Voices</h3>
+                <button class="btn" onclick="toggleElevenLabsSettings()" style="background: #0ea5e9; color: white; padding: 8px 16px; font-size: 0.9em;">
+                    ⚙️ Configure
+                </button>
+            </div>
+            
+            <div id="elevenLabsStatus" style="padding: 10px; border-radius: 6px; background: #fef3c7; border-left: 4px solid #f59e0b;">
+                <strong>Status:</strong> <span id="elevenLabsStatusText">Using Browser Voices (Free)</span>
+            </div>
+
+            <div id="elevenLabsSettings" style="display: none;">
+                <div style="background: white; padding: 20px; border-radius: 8px; margin-top: 15px;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #1e293b;">
+                            API Key:
+                        </label>
+                        <input type="password" id="elevenLabsApiKey" placeholder="Enter your ElevenLabs API key" 
+                               style="width: 100%; padding: 10px; border: 2px solid #cbd5e1; border-radius: 6px; font-size: 1em;">
+                        <small style="color: #64748b;">Get your API key from: <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" style="color: #0ea5e9;">elevenlabs.io</a></small>
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #1e293b;">
+                            Voice:
+                        </label>
+                        <select id="elevenLabsVoiceId" style="width: 100%; padding: 10px; border: 2px solid #cbd5e1; border-radius: 6px; font-size: 1em;">
+                            <option value="21m00Tcm4TlvDq8ikWAM">Rachel - Calm, Professional Female</option>
+                            <option value="AZnzlk1XvdvUeBnXmlld">Domi - Strong, Confident Female</option>
+                            <option value="EXAVITQu4vr4xnSDxMaL">Bella - Soft, Pleasant Female</option>
+                            <option value="ErXwobaYiN019PkySvjV">Antoni - Warm, Professional Male</option>
+                            <option value="VR6AewLTigWG4xSOukaG">Arnold - Crisp, Business Male</option>
+                            <option value="pNInz6obpgDQGcFmaJgB">Adam - Deep, Authoritative Male</option>
+                            <option value="yoZ06aMxZJJ28mfd3POQ">Sam - Dynamic, Energetic Male</option>
+                            <option value="TxGEqnHWrfWFTfGW9XjX">Josh - Young, Friendly Male</option>
+                        </select>
+                        <small style="color: #64748b;">Browse all voices: <a href="https://elevenlabs.io/voice-library" target="_blank" style="color: #0ea5e9;">Voice Library</a></small>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #1e293b;">
+                                Stability (0-1):
+                            </label>
+                            <input type="number" id="elevenLabsStability" value="0.5" min="0" max="1" step="0.05"
+                                   style="width: 100%; padding: 10px; border: 2px solid #cbd5e1; border-radius: 6px;">
+                            <small style="color: #64748b;">Lower = more expressive</small>
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #1e293b;">
+                                Similarity (0-1):
+                            </label>
+                            <input type="number" id="elevenLabsSimilarity" value="0.75" min="0" max="1" step="0.05"
+                                   style="width: 100%; padding: 10px; border: 2px solid #cbd5e1; border-radius: 6px;">
+                            <small style="color: #64748b;">Higher = more consistent</small>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-primary" onclick="saveElevenLabsSettings()" style="flex: 1; min-width: 200px;">
+                            💾 Save & Enable
+                        </button>
+                        <button class="btn" onclick="testElevenLabsVoice()" style="flex: 1; min-width: 150px; background: #0ea5e9; color: white;">
+                            🔊 Test Voice
+                        </button>
+                        <button class="btn" onclick="disableElevenLabs()" style="background: #64748b; color: white;">
+                            ❌ Disable
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="tabs">
             <div class="tab-buttons">
                 <button class="tab-button active" onclick="switchTab('training', event)">🎯 Training</button>
@@ -975,6 +1050,17 @@
         let isListening = false;
         let voiceEnabled = true;
 
+        // ElevenLabs Configuration
+        const ELEVENLABS_CONFIG = {
+            enabled: false, // Set to true to use ElevenLabs instead of browser voices
+            apiKey: '', // Add your ElevenLabs API key here
+            voiceId: '21m00Tcm4TlvDq8ikWAM', // Default: Rachel (change to your preferred voice ID)
+            model: 'eleven_monolingual_v1', // or 'eleven_multilingual_v2' for accents
+            stability: 0.5, // 0-1: Lower = more variable/expressive
+            similarityBoost: 0.75, // 0-1: Higher = stays closer to original voice
+            useSTT: false // Set to true to use ElevenLabs Speech-to-Text (when available)
+        };
+
         // Initialize speech recognition
         window.onload = function() {
             if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -1090,8 +1176,64 @@
             }
         }
 
-        function speakText(text) {
-            if (!voiceEnabled || !('speechSynthesis' in window)) {
+        async function speakText(text) {
+            if (!voiceEnabled) {
+                return;
+            }
+
+            // Use ElevenLabs if enabled and configured
+            if (ELEVENLABS_CONFIG.enabled && ELEVENLABS_CONFIG.apiKey) {
+                await speakWithElevenLabs(text);
+            } else {
+                // Fall back to browser speech synthesis
+                speakWithBrowser(text);
+            }
+        }
+
+        async function speakWithElevenLabs(text) {
+            try {
+                const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_CONFIG.voiceId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'audio/mpeg',
+                        'Content-Type': 'application/json',
+                        'xi-api-key': ELEVENLABS_CONFIG.apiKey
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        model_id: ELEVENLABS_CONFIG.model,
+                        voice_settings: {
+                            stability: ELEVENLABS_CONFIG.stability,
+                            similarity_boost: ELEVENLABS_CONFIG.similarityBoost
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    console.error('ElevenLabs API error:', response.status);
+                    // Fall back to browser voice
+                    speakWithBrowser(text);
+                    return;
+                }
+
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                };
+                
+                await audio.play();
+            } catch (error) {
+                console.error('ElevenLabs TTS error:', error);
+                // Fall back to browser voice
+                speakWithBrowser(text);
+            }
+        }
+
+        function speakWithBrowser(text) {
+            if (!('speechSynthesis' in window)) {
                 return;
             }
 
@@ -1129,6 +1271,147 @@
             document.getElementById('tabTeamAnalytics').style.display = showManager ? 'block' : 'none';
             document.getElementById('tabManagerDash').style.display = showManager ? 'block' : 'none';
         }
+
+        // ElevenLabs Settings Functions
+        function toggleElevenLabsSettings() {
+            const settings = document.getElementById('elevenLabsSettings');
+            settings.style.display = settings.style.display === 'none' ? 'block' : 'none';
+            
+            // Load saved settings if they exist
+            const saved = localStorage.getItem('elevenlabs_config');
+            if (saved) {
+                const config = JSON.parse(saved);
+                document.getElementById('elevenLabsApiKey').value = config.apiKey || '';
+                document.getElementById('elevenLabsVoiceId').value = config.voiceId || '21m00Tcm4TlvDq8ikWAM';
+                document.getElementById('elevenLabsStability').value = config.stability || 0.5;
+                document.getElementById('elevenLabsSimilarity').value = config.similarityBoost || 0.75;
+            }
+        }
+
+        function saveElevenLabsSettings() {
+            const apiKey = document.getElementById('elevenLabsApiKey').value.trim();
+            
+            if (!apiKey) {
+                alert('Please enter your ElevenLabs API key.\n\nGet one free at: https://elevenlabs.io/app/settings/api-keys');
+                return;
+            }
+
+            ELEVENLABS_CONFIG.enabled = true;
+            ELEVENLABS_CONFIG.apiKey = apiKey;
+            ELEVENLABS_CONFIG.voiceId = document.getElementById('elevenLabsVoiceId').value;
+            ELEVENLABS_CONFIG.stability = parseFloat(document.getElementById('elevenLabsStability').value);
+            ELEVENLABS_CONFIG.similarityBoost = parseFloat(document.getElementById('elevenLabsSimilarity').value);
+
+            // Save to localStorage
+            localStorage.setItem('elevenlabs_config', JSON.stringify(ELEVENLABS_CONFIG));
+
+            // Update status
+            updateElevenLabsStatus();
+
+            alert('✅ ElevenLabs enabled! Ultra-realistic voices will now be used.\n\nClick "Test Voice" to hear it!');
+        }
+
+        function testElevenLabsVoice() {
+            const testText = "Hi, I need to cancel my lawn service. I'm moving to Arizona next month for a new job.";
+            
+            // Temporarily save settings for test
+            const tempApiKey = document.getElementById('elevenLabsApiKey').value.trim();
+            if (!tempApiKey) {
+                alert('Please enter your API key first!');
+                return;
+            }
+
+            const tempConfig = {
+                enabled: true,
+                apiKey: tempApiKey,
+                voiceId: document.getElementById('elevenLabsVoiceId').value,
+                stability: parseFloat(document.getElementById('elevenLabsStability').value),
+                similarityBoost: parseFloat(document.getElementById('elevenLabsSimilarity').value)
+            };
+
+            // Test the voice
+            testElevenLabsAPI(testText, tempConfig);
+        }
+
+        async function testElevenLabsAPI(text, config) {
+            try {
+                updateStatus('🔊 Testing ElevenLabs voice...', 'waiting');
+                
+                const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${config.voiceId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'audio/mpeg',
+                        'Content-Type': 'application/json',
+                        'xi-api-key': config.apiKey
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        model_id: 'eleven_monolingual_v1',
+                        voice_settings: {
+                            stability: config.stability,
+                            similarity_boost: config.similarityBoost
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API Error ${response.status}: ${errorText}`);
+                }
+
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                    updateStatus('Ready to Start', 'waiting');
+                };
+                
+                await audio.play();
+                
+            } catch (error) {
+                console.error('ElevenLabs test error:', error);
+                alert('❌ Error testing voice:\n\n' + error.message + '\n\nPlease check:\n• API key is correct\n• You have API credits\n• Internet connection is working');
+                updateStatus('Ready to Start', 'waiting');
+            }
+        }
+
+        function disableElevenLabs() {
+            ELEVENLABS_CONFIG.enabled = false;
+            localStorage.removeItem('elevenlabs_config');
+            updateElevenLabsStatus();
+            alert('✅ ElevenLabs disabled. Now using free browser voices.');
+        }
+
+        function updateElevenLabsStatus() {
+            const statusText = document.getElementById('elevenLabsStatusText');
+            const statusDiv = document.getElementById('elevenLabsStatus');
+            
+            if (ELEVENLABS_CONFIG.enabled && ELEVENLABS_CONFIG.apiKey) {
+                statusText.textContent = '✅ ElevenLabs Active - Ultra-Realistic Voices';
+                statusDiv.style.background = '#d1fae5';
+                statusDiv.style.borderLeftColor = '#10b981';
+            } else {
+                statusText.textContent = 'Using Browser Voices (Free)';
+                statusDiv.style.background = '#fef3c7';
+                statusDiv.style.borderLeftColor = '#f59e0b';
+            }
+        }
+
+        // Load ElevenLabs settings on page load
+        window.addEventListener('load', function() {
+            const saved = localStorage.getItem('elevenlabs_config');
+            if (saved) {
+                const config = JSON.parse(saved);
+                ELEVENLABS_CONFIG.enabled = config.enabled || false;
+                ELEVENLABS_CONFIG.apiKey = config.apiKey || '';
+                ELEVENLABS_CONFIG.voiceId = config.voiceId || '21m00Tcm4TlvDq8ikWAM';
+                ELEVENLABS_CONFIG.stability = config.stability || 0.5;
+                ELEVENLABS_CONFIG.similarityBoost = config.similarityBoost || 0.75;
+                updateElevenLabsStatus();
+            }
+        });
 
         function switchTab(tabName, event) {
             // Get the clicked button - either from event or find it by tabName

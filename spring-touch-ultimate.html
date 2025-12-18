@@ -1000,9 +1000,35 @@
         let supabaseClient = null;
         let useDatabase = true; // Set to false to disable centralized database
         let currentUser = '';
+        let currentRole = 'agent';
+        let currentSession = null;
+        let uploadedCalls = [];
+        let recognition = null;
+        let isListening = false;
+        let voiceEnabled = true; // Enable text-to-speech for AI customer
+
+        // ElevenLabs Configuration (optional - for ultra-realistic voices)
+        const ELEVENLABS_CONFIG = {
+            enabled: false, // Set to true to use ElevenLabs instead of browser voices
+            apiKey: '', // Add your ElevenLabs API key here
+            voiceId: '21m00Tcm4TlvDq8ikWAM', // Default: Rachel
+            model: 'eleven_monolingual_v1',
+            stability: 0.5,
+            similarityBoost: 0.75
+        };
 
         // Initialize Supabase on page load
         window.addEventListener('DOMContentLoaded', async function() {
+            // Initialize voices (fixes voice loading in some browsers)
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.getVoices();
+                window.speechSynthesis.onvoiceschanged = () => {
+                    const voices = window.speechSynthesis.getVoices();
+                    console.log(`✅ ${voices.length} voices loaded`);
+                };
+            }
+
+            // Initialize Supabase database
             if (useDatabase && typeof supabase !== 'undefined') {
                 try {
                     const { createClient } = supabase;
@@ -1263,6 +1289,7 @@
 
         function speakWithBrowser(text) {
             if (!('speechSynthesis' in window)) {
+                console.warn('Speech synthesis not supported');
                 return;
             }
 
@@ -1274,20 +1301,42 @@
             utterance.pitch = 1.0;
             utterance.volume = 1.0;
             
-            // Try to use a natural voice
-            const voices = window.speechSynthesis.getVoices();
-            const preferredVoice = voices.find(voice => 
-                voice.name.includes('Google') || 
-                voice.name.includes('Natural') ||
-                voice.name.includes('Samantha') ||
-                voice.name.includes('Alex')
-            );
-            
-            if (preferredVoice) {
-                utterance.voice = preferredVoice;
-            }
+            // Function to set voice
+            const setVoice = () => {
+                const voices = window.speechSynthesis.getVoices();
+                if (voices.length === 0) {
+                    console.warn('No voices available yet');
+                    return false;
+                }
+                
+                const preferredVoice = voices.find(voice => 
+                    voice.name.includes('Google') || 
+                    voice.name.includes('Natural') ||
+                    voice.name.includes('Samantha') ||
+                    voice.name.includes('Alex')
+                );
+                
+                if (preferredVoice) {
+                    utterance.voice = preferredVoice;
+                    console.log('Using voice:', preferredVoice.name);
+                } else if (voices.length > 0) {
+                    utterance.voice = voices[0];
+                    console.log('Using default voice:', voices[0].name);
+                }
+                return true;
+            };
 
-            window.speechSynthesis.speak(utterance);
+            // Try to set voice immediately
+            if (setVoice()) {
+                window.speechSynthesis.speak(utterance);
+            } else {
+                // Wait for voices to load
+                window.speechSynthesis.onvoiceschanged = () => {
+                    if (setVoice()) {
+                        window.speechSynthesis.speak(utterance);
+                    }
+                };
+            }
         }
 
 

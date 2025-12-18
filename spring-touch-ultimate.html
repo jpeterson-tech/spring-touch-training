@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spring Touch Training - Ultimate Edition</title>
+    <title>Spring Touch Training - Complete with Centralized Database</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -740,9 +741,7 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="tabs">
             <div class="tab-buttons">
                 <button class="tab-button active" onclick="switchTab('training', event)">🎯 Training</button>
                 <button class="tab-button" onclick="switchTab('history', event)">📚 My History</button>
@@ -994,6 +993,53 @@
     </div>
 
     <script>
+        // ========== SUPABASE CENTRALIZED DATABASE ==========
+        const SUPABASE_URL = 'https://twzdiyzkmsxlsvzxisri.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3emRpeXprbXN4bHN2enhpc3JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMTEyMTcsImV4cCI6MjA4MTU4NzIxN30.4zeZ5S_MZk7wPDqBTsTkvqaWU1PawDyljnG4pDms9E0';
+        
+        let supabaseClient = null;
+        let useDatabase = true; // Set to false to disable centralized database
+        let currentUser = '';
+
+        // Initialize Supabase on page load
+        window.addEventListener('DOMContentLoaded', async function() {
+            if (useDatabase && typeof supabase !== 'undefined') {
+                try {
+                    const { createClient } = supabase;
+                    supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+                    console.log('✅ Centralized database connected!');
+                    showDatabaseNotification('✅ Connected to team database - All data synced!', 'success');
+                } catch (error) {
+                    console.error('Database connection error:', error);
+                    showDatabaseNotification('⚠️ Database unavailable - Using local storage', 'warning');
+                    supabaseClient = null;
+                }
+            }
+        });
+
+        function showDatabaseNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 25px;
+                border-radius: 8px;
+                font-weight: 600;
+                z-index: 10000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                ${type === 'success' ? 'background: #d1fae5; color: #065f46; border-left: 4px solid #10b981;' : 'background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b;'}
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transition = 'opacity 0.5s';
+                setTimeout(() => notification.remove(), 500);
+            }, 5000);
+        }
+
         // Scenario definitions with difficulty levels and full conversation data
         const SCENARIOS = {
             moving: [
@@ -1042,24 +1088,7 @@
             }
         };
 
-        let currentUser = '';
-        let currentRole = 'agent';
-        let currentSession = null;
-        let uploadedCalls = [];
-        let recognition = null;
-        let isListening = false;
-        let voiceEnabled = true;
 
-        // ElevenLabs Configuration
-        const ELEVENLABS_CONFIG = {
-            enabled: false, // Set to true to use ElevenLabs instead of browser voices
-            apiKey: '', // Add your ElevenLabs API key here
-            voiceId: '21m00Tcm4TlvDq8ikWAM', // Default: Rachel (change to your preferred voice ID)
-            model: 'eleven_monolingual_v1', // or 'eleven_multilingual_v2' for accents
-            stability: 0.5, // 0-1: Lower = more variable/expressive
-            similarityBoost: 0.75, // 0-1: Higher = stays closer to original voice
-            useSTT: false // Set to true to use ElevenLabs Speech-to-Text (when available)
-        };
 
         // Initialize speech recognition
         window.onload = function() {
@@ -1438,33 +1467,65 @@
             if (tabName === 'leaderboard') loadLeaderboard();
             if (tabName === 'teamanalytics') loadTeamAnalytics();
             if (tabName === 'managerdash') loadManagerDashboard();
-        }
-
-        function loadUserData() {
+        }        async function loadUserData() {
             currentUser = document.getElementById('agentName').value.trim();
             if (!currentUser) {
                 alert('Please enter your name');
                 return;
             }
 
-            const userData = JSON.parse(localStorage.getItem('springtouch_users') || '{}');
-            const user = userData[currentUser] || {
-                sessions: [],
-                totalSessions: 0,
-                avgScore: 0,
-                bestScenario: '-',
-                improvement: 0,
-                level: 'Beginner'
-            };
+            if (supabaseClient && useDatabase) {
+                try {
+                    const { data: agent, error } = await supabaseClient
+                        .from('agents')
+                        .select('*')
+                        .eq('name', currentUser)
+                        .maybeSingle();
 
-            document.getElementById('totalSessions').textContent = user.totalSessions;
-            document.getElementById('avgScore').textContent = user.avgScore + '%';
-            document.getElementById('bestScenario').textContent = user.bestScenario;
-            document.getElementById('improvement').textContent = user.improvement > 0 ? '+' + user.improvement + '%' : user.improvement + '%';
-            document.getElementById('currentLevel').textContent = user.level || 'Beginner';
+                    if (agent) {
+                        document.getElementById('totalSessions').textContent = agent.total_sessions || 0;
+                        document.getElementById('avgScore').textContent = (agent.avg_score || 0) + '%';
+                        document.getElementById('bestScenario').textContent = agent.best_scenario || '-';
+                        document.getElementById('improvement').textContent = 
+                            (agent.improvement || 0) > 0 ? '+' + agent.improvement + '%' : (agent.improvement || 0) + '%';
+                        document.getElementById('currentLevel').textContent = agent.skill_level || 'Beginner';
+                        
+                        console.log('✅ Loaded data from centralized database');
+                    } else {
+                        // New user - set defaults
+                        document.getElementById('totalSessions').textContent = '0';
+                        document.getElementById('avgScore').textContent = '0%';
+                        document.getElementById('bestScenario').textContent = '-';
+                        document.getElementById('improvement').textContent = '-';
+                        document.getElementById('currentLevel').textContent = 'Beginner';
+                    }
+                } catch (error) {
+                    console.error('Error loading from database:', error);
+                    loadUserDataFromLocalStorage();
+                }
+            } else {
+                loadUserDataFromLocalStorage();
+            }
+        }
 
-            updateStatus('Welcome back, ' + currentUser + '!', 'waiting');
-            updateAdaptiveRecommendation();
+        function loadUserDataFromLocalStorage() {
+            const users = JSON.parse(localStorage.getItem('springtouch_users') || '{}');
+            const user = users[currentUser];
+
+            if (user) {
+                document.getElementById('totalSessions').textContent = user.totalSessions || 0;
+                document.getElementById('avgScore').textContent = (user.avgScore || 0) + '%';
+                document.getElementById('bestScenario').textContent = user.bestScenario || '-';
+                document.getElementById('improvement').textContent = 
+                    (user.improvement || 0) > 0 ? '+' + user.improvement + '%' : (user.improvement || 0) + '%';
+                document.getElementById('currentLevel').textContent = user.level || 'Beginner';
+            } else {
+                document.getElementById('totalSessions').textContent = '0';
+                document.getElementById('avgScore').textContent = '0%';
+                document.getElementById('bestScenario').textContent = '-';
+                document.getElementById('improvement').textContent = '-';
+                document.getElementById('currentLevel').textContent = 'Beginner';
+            }
         }
 
         function updateAdaptiveRecommendation() {
@@ -2067,6 +2128,182 @@
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
+        }        async function saveSession(session) {
+            if (supabaseClient && useDatabase) {
+                try {
+                    await saveSessionToDatabase(session);
+                } catch (error) {
+                    console.error('Database save failed, using localStorage:', error);
+                    saveSessionToLocalStorage(session);
+                }
+            } else {
+                saveSessionToLocalStorage(session);
+            }
+        }
+
+        async function saveSessionToDatabase(session) {
+            // Get or create agent
+            let { data: agent, error: fetchError } = await supabaseClient
+                .from('agents')
+                .select('id')
+                .eq('name', currentUser)
+                .maybeSingle();
+
+            let agentId;
+            if (!agent) {
+                const { data: newAgent, error: insertError } = await supabaseClient
+                    .from('agents')
+                    .insert([{ 
+                        name: currentUser,
+                        last_active: new Date().toISOString()
+                    }])
+                    .select()
+                    .single();
+
+                if (insertError) throw insertError;
+                agentId = newAgent.id;
+            } else {
+                agentId = agent.id;
+                
+                // Update last_active
+                await supabaseClient
+                    .from('agents')
+                    .update({ last_active: new Date().toISOString() })
+                    .eq('id', agentId);
+            }
+
+            // Save session to database
+            const { error: sessionError } = await supabaseClient
+                .from('sessions')
+                .insert([{
+                    agent_id: agentId,
+                    agent_name: currentUser,
+                    scenario: session.scenario,
+                    scenario_name: session.scenarioName || session.scenario,
+                    start_time: session.startTime,
+                    end_time: session.endTime,
+                    score: session.score,
+                    good_moves: session.goodMoves || 0,
+                    bad_moves: session.badMoves || 0,
+                    conversation: session.conversation
+                }]);
+
+            if (sessionError) throw sessionError;
+
+            // Update agent stats
+            await updateAgentStatsInDatabase(agentId);
+
+            console.log('✅ Session saved to centralized database');
+            showDatabaseNotification('💾 Session saved to team database!', 'success');
+        }
+
+        async function updateAgentStatsInDatabase(agentId) {
+            try {
+                const { data: sessions, error } = await supabaseClient
+                    .from('sessions')
+                    .select('*')
+                    .eq('agent_id', agentId)
+                    .order('created_at', { ascending: true });
+
+                if (error) throw error;
+                if (!sessions || sessions.length === 0) return;
+
+                const totalSessions = sessions.length;
+                const avgScore = sessions.reduce((sum, s) => sum + s.score, 0) / totalSessions;
+
+                // Find best scenario
+                const scenarioScores = {};
+                sessions.forEach(s => {
+                    if (!scenarioScores[s.scenario]) scenarioScores[s.scenario] = [];
+                    scenarioScores[s.scenario].push(s.score);
+                });
+
+                let bestScenario = '-';
+                let bestAvg = 0;
+                Object.keys(scenarioScores).forEach(scenario => {
+                    const avg = scenarioScores[scenario].reduce((a, b) => a + b, 0) / scenarioScores[scenario].length;
+                    if (avg > bestAvg) {
+                        bestAvg = avg;
+                        bestScenario = scenario;
+                    }
+                });
+
+                // Calculate improvement
+                let improvement = 0;
+                if (sessions.length >= 4) {
+                    const recent = sessions.slice(-3);
+                    const earlier = sessions.slice(0, -3);
+                    const recentAvg = recent.reduce((sum, s) => sum + s.score, 0) / recent.length;
+                    const earlierAvg = earlier.reduce((sum, s) => sum + s.score, 0) / earlier.length;
+                    improvement = ((recentAvg - earlierAvg) / earlierAvg) * 100;
+                }
+
+                // Determine skill level
+                let skillLevel = 'Beginner';
+                if (avgScore >= 80 && totalSessions >= 10) skillLevel = 'Expert';
+                else if (avgScore >= 70 && totalSessions >= 5) skillLevel = 'Advanced';
+                else if (avgScore >= 60 && totalSessions >= 3) skillLevel = 'Intermediate';
+
+                // Update agent record
+                await supabaseClient
+                    .from('agents')
+                    .update({
+                        total_sessions: totalSessions,
+                        avg_score: parseFloat(avgScore.toFixed(2)),
+                        best_scenario: bestScenario,
+                        improvement: parseFloat(improvement.toFixed(2)),
+                        skill_level: skillLevel
+                    })
+                    .eq('id', agentId);
+
+            } catch (error) {
+                console.error('Error updating agent stats:', error);
+            }
+        }
+
+        function saveSessionToLocalStorage(session) {
+            const users = JSON.parse(localStorage.getItem('springtouch_users') || '{}');
+            
+            if (!users[currentUser]) {
+                users[currentUser] = {
+                    sessions: [],
+                    totalSessions: 0,
+                    avgScore: 0,
+                    bestScenario: '-',
+                    improvement: 0,
+                    level: 'Beginner'
+                };
+            }
+
+            users[currentUser].sessions.push(session);
+            users[currentUser].totalSessions++;
+            
+            const scores = users[currentUser].sessions.map(s => s.score);
+            users[currentUser].avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+            
+            const scenarioCounts = {};
+            users[currentUser].sessions.forEach(s => {
+                scenarioCounts[s.scenario] = (scenarioCounts[s.scenario] || 0) + 1;
+            });
+            users[currentUser].bestScenario = Object.keys(scenarioCounts).reduce((a, b) => 
+                scenarioCounts[a] > scenarioCounts[b] ? a : b
+            );
+
+            if (scores.length >= 2) {
+                const recent = scores.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, scores.length);
+                const earlier = scores.slice(0, -3).reduce((a, b) => a + b, 0) / Math.max(1, scores.length - 3);
+                users[currentUser].improvement = Math.round(recent - earlier);
+            }
+
+            const avgScore = users[currentUser].avgScore;
+            const totalSessions = users[currentUser].totalSessions;
+            users[currentUser].level = 
+                avgScore >= 80 && totalSessions >= 10 ? 'Expert' :
+                avgScore >= 70 && totalSessions >= 5 ? 'Advanced' :
+                avgScore >= 60 && totalSessions >= 3 ? 'Intermediate' :
+                'Beginner';
+
+            localStorage.setItem('springtouch_users', JSON.stringify(users));
         }
 
         function saveSession(session) {
